@@ -9,6 +9,7 @@ setup(
     },
     ext_modules=cythonize([
         "candle_dvm/device_bin.pyx",
+        "candle_dvm/isa.pyx",
     ]),
     extras_require={"test": ["pytest"]},
 )
