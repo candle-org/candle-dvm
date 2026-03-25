@@ -7,13 +7,18 @@ import pytest
 from candle_dvm import isa
 from candle_dvm.code import Code, RelocAddr
 from candle_dvm.ops import (
+    DTYPE_BOOL,
     DTYPE_F32,
+    DTYPE_INT32,
     BIN_ADD,
+    UNARY_ISFINITE,
+    UNARY_SQRT,
     OBJ_LOAD,
     OBJ_STORE,
     OBJ_BINARY,
     NDLoad,
     NDStore,
+    UnaryOp,
     BinaryOp,
 )
 from candle_dvm.pass_ import run_passes
@@ -418,3 +423,78 @@ class TestPassManager:
         load = NDLoad(io_index=0, shape=(4, 8), dtype=DTYPE_F32)
         result = run_passes([load])
         assert result[0] is load
+
+
+# ===================================================================
+# UnaryOp -- construction, normalize, emit
+# ===================================================================
+
+class TestUnaryOp:
+    def _make_load(self, shape=(4, 8), dtype=DTYPE_F32):
+        load = NDLoad(io_index=0, shape=shape, dtype=dtype)
+        load.normalize()
+        load.xbuf = 0
+        return load
+
+    def test_normalize_preserves_shape_and_dtype_for_sqrt(self):
+        """UnaryOp normalize should set output shape = input shape
+        and output dtype = input dtype for sqrt."""
+        src = self._make_load(shape=(4, 8), dtype=DTYPE_F32)
+        op = UnaryOp(UNARY_SQRT, src)
+        op.normalize()
+        assert op.shape_ref == (4, 8)
+        assert op.type_id == DTYPE_F32
+        assert op.normalized is True
+
+    def test_normalize_sets_bool_dtype_for_isfinite(self):
+        """UnaryOp(isfinite) should set output dtype to DTYPE_BOOL."""
+        src = self._make_load(shape=(4, 8), dtype=DTYPE_F32)
+        op = UnaryOp(UNARY_ISFINITE, src)
+        op.normalize()
+        assert op.shape_ref == (4, 8)
+        assert op.type_id == DTYPE_BOOL
+
+    def test_emit_appends_exactly_two_words(self):
+        """UnaryOp.emit should append exactly 2 u64 words (16 bytes)."""
+        src = self._make_load(shape=(4, 8), dtype=DTYPE_F32)
+        op = UnaryOp(UNARY_SQRT, src)
+        op.normalize()
+        op.xbuf = 1
+
+        code = Code()
+        relocs = []
+        try:
+            op.emit(code, relocs)
+            assert code.size == 16  # 2 words * 8 bytes
+        finally:
+            code.free()
+
+    def test_emit_registers_zero_relocations(self):
+        """UnaryOp.emit should register 0 relocations."""
+        src = self._make_load(shape=(4, 8), dtype=DTYPE_F32)
+        op = UnaryOp(UNARY_SQRT, src)
+        op.normalize()
+        op.xbuf = 1
+
+        code = Code()
+        relocs = []
+        try:
+            op.emit(code, relocs)
+            assert len(relocs) == 0
+        finally:
+            code.free()
+
+    def test_emit_raises_for_unsupported_dtype(self):
+        """UnaryOp.emit should raise NotImplementedError for INT32 + SQRT."""
+        src = self._make_load(shape=(4, 8), dtype=DTYPE_INT32)
+        op = UnaryOp(UNARY_SQRT, src)
+        op.normalize()
+        op.xbuf = 1
+
+        code = Code()
+        relocs = []
+        try:
+            with pytest.raises(NotImplementedError):
+                op.emit(code, relocs)
+        finally:
+            code.free()
