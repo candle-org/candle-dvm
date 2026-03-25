@@ -66,14 +66,22 @@ def test_kernel_exposes_isfinite_method():
     assert f.type_id == DTYPE_BOOL
 
 
+def test_float16_is_exported():
+    """float16 should be importable from the candle_dvm namespace."""
+    import candle_dvm as dvm
+    assert hasattr(dvm, "float16")
+
+
 def test_reciprocal_is_not_exposed():
     """reciprocal should not be on the public Kernel API."""
-    assert not hasattr(Kernel, "reciprocal")
+    import candle_dvm as dvm
+    assert not hasattr(dvm.Kernel, "reciprocal")
 
 
 def test_logical_not_is_not_exposed():
     """logical_not should not be on the public Kernel API."""
-    assert not hasattr(Kernel, "logical_not")
+    import candle_dvm as dvm
+    assert not hasattr(dvm.Kernel, "logical_not")
 
 
 def test_kernel_exposes_batch_b_binary_methods():
