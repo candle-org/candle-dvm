@@ -59,6 +59,8 @@ from candle_dvm.isa import (
 )
 from candle_dvm.isa cimport make_acc_head, make_simd_head, encode_unary, encode_binary_scalar
 
+import struct as _struct
+
 
 # ===================================================================
 # Constants  -- match upstream dvm.h enums
@@ -668,8 +670,6 @@ cdef class UnaryOp(FlexOp):
 # ===================================================================
 # Scalar bit packing helpers
 # ===================================================================
-
-import struct as _struct
 
 cdef unsigned long long _float_to_fp32_bits(double val):
     """Convert a Python float to raw IEEE754 32-bit bits."""

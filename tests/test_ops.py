@@ -705,8 +705,11 @@ def test_binary_scalar_emit_appends_two_words():
     op = BinaryScalarOp(op_type=BINS_ADD, src=x, scalar=1.0)
     op.normalize(); op.xbuf = 0x400
     code = Code(capacity=4096)
-    op.emit(code, [])
-    assert code.size == 16
+    try:
+        op.emit(code, [])
+        assert code.size == 16
+    finally:
+        code.free()
 
 
 def test_binary_scalar_emit_raises_for_unsupported_dtype():
@@ -715,5 +718,8 @@ def test_binary_scalar_emit_raises_for_unsupported_dtype():
     op = BinaryScalarOp(op_type=BINS_DIV, src=x, scalar=1.0)
     op.normalize(); op.xbuf = 0x400
     code = Code(capacity=4096)
-    with pytest.raises(NotImplementedError):
-        op.emit(code, [])
+    try:
+        with pytest.raises(NotImplementedError):
+            op.emit(code, [])
+    finally:
+        code.free()
