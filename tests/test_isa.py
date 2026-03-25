@@ -316,6 +316,27 @@ class TestBinaryOpcodeTable:
 
 
 # ---------------------------------------------------------------------------
+# BINARY_SCALAR_OPCODE_TABLE routing
+# ---------------------------------------------------------------------------
+
+def test_binary_scalar_opcode_routing_fp32_and_fp16():
+    expected = {
+        (isa.BINS_ADD, isa.DTYPE_F32): isa.V_ADDS,
+        (isa.BINS_ADD, isa.DTYPE_FP16): isa.V_ADDS_FP16,
+        (isa.BINS_MUL, isa.DTYPE_F32): isa.V_MULS,
+        (isa.BINS_MUL, isa.DTYPE_FP16): isa.V_MULS_FP16,
+        (isa.BINS_DIV, isa.DTYPE_F32): isa.V_DIVS,
+        (isa.BINS_DIV, isa.DTYPE_FP16): isa.V_DIVS_FP16,
+        (isa.BINS_MAX, isa.DTYPE_F32): isa.V_MAXS,
+        (isa.BINS_MAX, isa.DTYPE_FP16): isa.V_MAXS_FP16,
+        (isa.BINS_MIN, isa.DTYPE_F32): isa.V_MINS,
+        (isa.BINS_MIN, isa.DTYPE_FP16): isa.V_MINS_FP16,
+    }
+    for key, val in expected.items():
+        assert isa.BINARY_SCALAR_OPCODE_TABLE[key] == val
+
+
+# ---------------------------------------------------------------------------
 # encode_unary  -- vUnary 2-word instruction encoding
 # ---------------------------------------------------------------------------
 
