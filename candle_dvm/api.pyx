@@ -19,7 +19,11 @@ Example
 """
 
 from candle_dvm.kernel import VKernelS
-from candle_dvm.ops import NDLoad, NDStore, BinaryOp, BIN_ADD
+from candle_dvm.ops import (
+    NDLoad, NDStore, BinaryOp, BIN_ADD,
+    UnaryOp, UNARY_SQRT, UNARY_ABS, UNARY_LOG, UNARY_EXP,
+    UNARY_ROUND, UNARY_FLOOR, UNARY_CEIL, UNARY_TRUNC, UNARY_ISFINITE,
+)
 
 
 cdef class Kernel:
@@ -108,6 +112,64 @@ cdef class Kernel:
             The created add node, already appended to the kernel.
         """
         cdef object node = BinaryOp(BIN_ADD, a, b)
+        self._kernel.append(node)
+        return node
+
+    # ---------------------------------------------------------------
+    # Unary methods (Batch A)
+    # ---------------------------------------------------------------
+
+    cpdef object sqrt(self, object x):
+        """Element-wise square root."""
+        cdef object node = UnaryOp(UNARY_SQRT, x)
+        self._kernel.append(node)
+        return node
+
+    cpdef object abs(self, object x):
+        """Element-wise absolute value."""
+        cdef object node = UnaryOp(UNARY_ABS, x)
+        self._kernel.append(node)
+        return node
+
+    cpdef object log(self, object x):
+        """Element-wise natural logarithm."""
+        cdef object node = UnaryOp(UNARY_LOG, x)
+        self._kernel.append(node)
+        return node
+
+    cpdef object exp(self, object x):
+        """Element-wise exponential."""
+        cdef object node = UnaryOp(UNARY_EXP, x)
+        self._kernel.append(node)
+        return node
+
+    cpdef object round(self, object x):
+        """Element-wise round to nearest integer."""
+        cdef object node = UnaryOp(UNARY_ROUND, x)
+        self._kernel.append(node)
+        return node
+
+    cpdef object floor(self, object x):
+        """Element-wise floor."""
+        cdef object node = UnaryOp(UNARY_FLOOR, x)
+        self._kernel.append(node)
+        return node
+
+    cpdef object ceil(self, object x):
+        """Element-wise ceiling."""
+        cdef object node = UnaryOp(UNARY_CEIL, x)
+        self._kernel.append(node)
+        return node
+
+    cpdef object trunc(self, object x):
+        """Element-wise truncation toward zero."""
+        cdef object node = UnaryOp(UNARY_TRUNC, x)
+        self._kernel.append(node)
+        return node
+
+    cpdef object isfinite(self, object x):
+        """Element-wise finiteness test (returns bool dtype)."""
+        cdef object node = UnaryOp(UNARY_ISFINITE, x)
         self._kernel.append(node)
         return node
 
