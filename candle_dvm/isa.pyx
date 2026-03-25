@@ -264,7 +264,180 @@ SIMD_FUNC_OFFSET = [
     0x8b14,  # V_MIN = 22
     0x8b60,  # V_MAX = 23
     0x8bac,  # V_CMP = 24
+    0x92e0,  # V_CAST_FP32_TO_FP16 = 25
+    0x9320,  # V_CAST_FP32_TO_INT32 = 26
+    0x9360,  # V_RSUM_X = 27
+    0x9620,  # V_RSUM_Y = 28
+    0x981c,  # V_RMAX_X = 29
+    0x9adc,  # V_RMAX_Y = 30
+    0x9cd8,  # V_RMIN_X = 31
+    0x9f98,  # V_RMIN_Y = 32
+    0xab1c,  # V_RSUM_JOIN = 33
+    0xae20,  # V_SEL = 34
+    0xaf2c,  # V_POW = 35
+    0xb25c,  # V_CLR_PAD = 36
+    0xb5d4,  # V_ELEMENT_ANY = 37
+    0xb760,  # V_ONE_HOT = 38
+    0xb9e8,  # V_BROADCAST_X_B16 = 39
+    0xbcb8,  # V_BROADCAST_S_B16 = 40
+    0xbcfc,  # V_SQRT_FP16 = 41
+    0xbd3c,  # V_ABS_FP16 = 42
+    0xbd7c,  # V_LOG_FP16 = 43
+    0xbdbc,  # V_EXP_FP16 = 44
+    0xbdfc,  # V_ADDS_FP16 = 45
+    0xbe4c,  # V_MULS_FP16 = 46
+    0xd860,  # V_DIVS_FP16 = 47
+    0xd774,  # V_SDIV_FP16 = 48
+    0xc4c4,  # V_CMPS_FP16 = 49
+    0xbe9c,  # V_ADD_FP16 = 50
+    0xbee8,  # V_SUB_FP16 = 51
+    0xbf34,  # V_MUL_FP16 = 52
+    0xbf80,  # V_DIV_FP16 = 53
+    0xbfcc,  # V_MIN_FP16 = 54
+    0xc018,  # V_MAX_FP16 = 55
+    0xc064,  # V_CAST_FP16_TO_BOOL = 56
+    0xc0a4,  # V_CAST_FP16_TO_FP32 = 57
+    0xc0e4,  # V_CAST_FP16_TO_INT32 = 58
+    0xa194,  # V_RMAX_X_FP16 = 59
+    0xa45c,  # V_RMAX_Y_FP16 = 60
+    0xa658,  # V_RMIN_X_FP16 = 61
+    0xa920,  # V_RMIN_Y_FP16 = 62
+    0xb3ec,  # V_CLR_PAD_B16 = 63
+    0xc124,  # V_CMP_FP16 = 64
+    0xc848,  # V_SEL_FP16 = 65
+    0xc954,  # V_ISFINITE_FP16 = 66
+    0xc9f0,  # V_ONE_HOT_B16 = 67
+    0xcc94,  # V_CAST_BOOL_TO_FP16 = 68
+    0x8354,  # V_BROADCAST_X_B32 = 69
+    0xccd4,  # V_ADD_INT32 = 70
+    0xcd20,  # V_SUB_INT32 = 71
+    0xcd6c,  # V_MUL_INT32 = 72
+    0xcdb8,  # V_MIN_INT32 = 73
+    0xce04,  # V_MAX_INT32 = 74
+    0xce50,  # V_SEL_INT32 = 75
+    0xcf5c,  # V_CAST_INT32_TO_FP16 = 76
+    0xcfa4,  # V_CAST_INT32_TO_FP32 = 77
+    0xcfe4,  # V_ISFINITE = 78
+    0xd080,  # V_MAXS = 79
+    0xd0cc,  # V_MINS = 80
+    0xd118,  # V_MAXS_FP16 = 81
+    0xd168,  # V_MINS_FP16 = 82
+    0xd1b8,  # V_ADDS_INT32 = 83
+    0xd208,  # V_MULS_INT32 = 84
+    0xd258,  # V_MAXS_INT32 = 85
+    0xd2a8,  # V_MINS_INT32 = 86
+    0xd2f8,  # V_REMOVEPAD_U16 = 87
+    0xd364,  # V_REMOVEPAD = 88
+    0xd3d0,  # V_ATOMICCUM = 89
+    0xd508,  # V_ATOMICCUM_FP16 = 90
+    0xd6c0,  # V_CAST_FP32_TO_BF16 = 91
+    0xd640,  # V_CAST_BF16_TO_FP32 = 92
+    0xd680,  # V_CAST_BF16_TO_INT32 = 93
+    0xd8d8,  # V_CMP_INT32 = 94
+    0x0000,  # V_ABS_INT32 = 95 (not in c220)
+    0x0000,  # V_CMPS_INT32 = 96 (not in c220)
+    0x0000,  # V_ADDS_BF16 = 97 (not in c220)
+    0x0000,  # V_MULS_BF16 = 98 (not in c220)
+    0x0000,  # V_MAXS_BF16 = 99 (not in c220)
+    0x0000,  # V_MINS_BF16 = 100 (not in c220)
+    0x0000,  # V_CMP_BF16 = 101 (not in c220)
+    0x0000,  # V_CMPS_BF16 = 102 (not in c220)
+    0x0000,  # V_ADD_BF16 = 103 (not in c220)
+    0x0000,  # V_SUB_BF16 = 104 (not in c220)
+    0x0000,  # V_MUL_BF16 = 105 (not in c220)
+    0x0000,  # V_MIN_BF16 = 106 (not in c220)
+    0x0000,  # V_MAX_BF16 = 107 (not in c220)
+    0x0000,  # V_ISFINITE_BF16 = 108 (not in c220)
+    0x0000,  # V_SEL_BF16 = 109 (not in c220)
+    0x0000,  # V_NONE = 110
 ]
+
+
+# ===================================================================
+# DataType constants  (dvm.h DataType enum)
+# ===================================================================
+DTYPE_FP16 = 1
+DTYPE_F32  = 3
+
+# ===================================================================
+# UnaryType constants  (dvm.h UnaryType enum)
+# ===================================================================
+UNARY_SQRT     = 0
+UNARY_ABS      = 1
+UNARY_LOG      = 2
+UNARY_EXP      = 3
+UNARY_ISFINITE = 5
+UNARY_ROUND    = 7
+UNARY_FLOOR    = 8
+UNARY_CEIL     = 9
+UNARY_TRUNC    = 10
+
+# ===================================================================
+# BinaryType constants  (dvm.h BinaryType enum)
+# ===================================================================
+BIN_ADD = 6
+BIN_SUB = 7
+BIN_MUL = 8
+BIN_DIV = 9
+BIN_MAX = 11
+BIN_MIN = 12
+
+# ===================================================================
+# Unary opcode routing table
+# Maps (UnaryType, DataType) -> vSimdInsnID
+# Derived from ops.cc unary_id_list[]
+# ===================================================================
+UNARY_OPCODE_TABLE = {
+    # sqrt
+    (UNARY_SQRT, DTYPE_F32):  V_SQRT,
+    (UNARY_SQRT, DTYPE_FP16): V_SQRT_FP16,
+    # abs
+    (UNARY_ABS, DTYPE_F32):  V_ABS,
+    (UNARY_ABS, DTYPE_FP16): V_ABS_FP16,
+    # log
+    (UNARY_LOG, DTYPE_F32):  V_LOG,
+    (UNARY_LOG, DTYPE_FP16): V_LOG_FP16,
+    # exp
+    (UNARY_EXP, DTYPE_F32):  V_EXP,
+    (UNARY_EXP, DTYPE_FP16): V_EXP_FP16,
+    # round (f32 only -- no fp16 variant upstream)
+    (UNARY_ROUND, DTYPE_F32): V_ROUND,
+    # floor (f32 only)
+    (UNARY_FLOOR, DTYPE_F32): V_FLOOR,
+    # ceil (f32 only)
+    (UNARY_CEIL, DTYPE_F32): V_CEIL,
+    # trunc (f32 only)
+    (UNARY_TRUNC, DTYPE_F32): V_TRUNC,
+    # isfinite
+    (UNARY_ISFINITE, DTYPE_F32):  V_ISFINITE,
+    (UNARY_ISFINITE, DTYPE_FP16): V_ISFINITE_FP16,
+}
+
+# ===================================================================
+# Binary opcode routing table
+# Maps (BinaryType, DataType) -> vSimdInsnID
+# Derived from ops.cc binary_id_list[]
+# ===================================================================
+BINARY_OPCODE_TABLE = {
+    # add
+    (BIN_ADD, DTYPE_F32):  V_ADD,
+    (BIN_ADD, DTYPE_FP16): V_ADD_FP16,
+    # sub
+    (BIN_SUB, DTYPE_F32):  V_SUB,
+    (BIN_SUB, DTYPE_FP16): V_SUB_FP16,
+    # mul
+    (BIN_MUL, DTYPE_F32):  V_MUL,
+    (BIN_MUL, DTYPE_FP16): V_MUL_FP16,
+    # div
+    (BIN_DIV, DTYPE_F32):  V_DIV,
+    (BIN_DIV, DTYPE_FP16): V_DIV_FP16,
+    # max
+    (BIN_MAX, DTYPE_F32):  V_MAX,
+    (BIN_MAX, DTYPE_FP16): V_MAX_FP16,
+    # min
+    (BIN_MIN, DTYPE_F32):  V_MIN,
+    (BIN_MIN, DTYPE_FP16): V_MIN_FP16,
+}
 
 
 # ===================================================================
@@ -336,3 +509,39 @@ cpdef unsigned long long make_simd_head(
         | (hw_id << V_HEAD_ID_OFFSET)
         | (1 << V_HEAD_SIMD_FLAG_OFFSET)
     )
+
+
+cpdef list encode_unary(
+    unsigned long long opcode,
+    unsigned long long xd,
+    unsigned long long xn,
+    unsigned long long count,
+):
+    """Encode a vUnary 2-word SIMD instruction.
+
+    Matches the upstream vUnary layout from isa.h:
+      pc[0] = make_simd_head(opcode, xd, 2)
+      pc[1] = xn << 32 | count
+
+    Note: for vUnary the ext field carries **xd** (the destination),
+    unlike vBinary where ext = xn.
+
+    Parameters
+    ----------
+    opcode : int
+        SIMD opcode (e.g. ``V_SQRT``).
+    xd : int
+        Destination register address (26 bits, goes into ext field).
+    xn : int
+        Source register address (upper 32 bits of word 1).
+    count : int
+        Element count (lower 32 bits of word 1).
+
+    Returns
+    -------
+    list
+        Two-element list of uint64 values ``[head, payload]``.
+    """
+    cdef unsigned long long head = make_simd_head(opcode, xd, 2)
+    cdef unsigned long long payload = (xn << 32) | count
+    return [head, payload]

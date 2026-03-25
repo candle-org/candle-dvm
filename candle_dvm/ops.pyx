@@ -16,6 +16,17 @@ from candle_dvm.isa import (
     V_LOAD,
     V_STORE,
     V_ADD,
+    V_ADD_FP16,
+    V_SUB,
+    V_SUB_FP16,
+    V_MUL,
+    V_MUL_FP16,
+    V_DIV,
+    V_DIV_FP16,
+    V_MAX,
+    V_MAX_FP16,
+    V_MIN,
+    V_MIN_FP16,
     V_HEAD_ID_OFFSET,
     V_HEAD_EXT_OFFSET,
     V_HEAD_SIZE_OFFSET,
@@ -36,8 +47,9 @@ from candle_dvm.isa import (
     V_M_HEAD_WAIT_EVENT_OFFSET,
     V_X_MASK,
     V_C_X_BITS,
+    UNARY_OPCODE_TABLE,
 )
-from candle_dvm.isa import make_acc_head, make_simd_head
+from candle_dvm.isa cimport make_acc_head, make_simd_head, encode_unary
 
 
 # ===================================================================
@@ -68,8 +80,24 @@ _SIMD_WIDTH[2] = 16  # kBFloat16
 _SIMD_WIDTH[3] = 8   # kFloat32
 _SIMD_WIDTH[4] = 8   # kInt32
 
-# BinaryType  (dvm.h) -- kAdd is index 6
+# UnaryType  (dvm.h)
+UNARY_SQRT = 0
+UNARY_ABS = 1
+UNARY_LOG = 2
+UNARY_EXP = 3
+UNARY_ISFINITE = 5
+UNARY_ROUND = 7
+UNARY_FLOOR = 8
+UNARY_CEIL = 9
+UNARY_TRUNC = 10
+
+# BinaryType  (dvm.h)
 BIN_ADD = 6
+BIN_SUB = 7
+BIN_MUL = 8
+BIN_DIV = 9
+BIN_MAX = 11
+BIN_MIN = 12
 
 # ObjectType  (ops.h)
 OBJ_LOAD_DUMMY = 0
@@ -78,6 +106,7 @@ OBJ_VIEW_LOAD  = 2
 OBJ_LOAD       = 3
 OBJ_PAD_STORE  = 4
 OBJ_STORE      = 5
+OBJ_UNARY      = 12
 OBJ_BINARY     = 14
 
 # Instruction format constants
@@ -85,11 +114,27 @@ OBJ_BINARY     = 14
 # vStore: RELOC_OFFSET=2, ROUND_OFFSET=3
 # vBinary: 2 words, no reloc
 
-# binary_id_list lookup for phase 1:
-# binary_id_list[BIN_ADD].ids[DTYPE_F32] = V_ADD (=18)
+# binary_id_list lookup: (BinaryType, DataType) -> vSimdInsnID
 cdef dict _BINARY_ID_TABLE
 _BINARY_ID_TABLE = {
-    (BIN_ADD, DTYPE_F32): V_ADD,
+    # add
+    (BIN_ADD, DTYPE_F32):  V_ADD,
+    (BIN_ADD, DTYPE_FP16): V_ADD_FP16,
+    # sub
+    (BIN_SUB, DTYPE_F32):  V_SUB,
+    (BIN_SUB, DTYPE_FP16): V_SUB_FP16,
+    # mul
+    (BIN_MUL, DTYPE_F32):  V_MUL,
+    (BIN_MUL, DTYPE_FP16): V_MUL_FP16,
+    # div
+    (BIN_DIV, DTYPE_F32):  V_DIV,
+    (BIN_DIV, DTYPE_FP16): V_DIV_FP16,
+    # max
+    (BIN_MAX, DTYPE_F32):  V_MAX,
+    (BIN_MAX, DTYPE_FP16): V_MAX_FP16,
+    # min
+    (BIN_MIN, DTYPE_F32):  V_MIN,
+    (BIN_MIN, DTYPE_FP16): V_MIN_FP16,
 }
 
 
@@ -421,7 +466,7 @@ cdef class FlexOp(NDObject):
 
 
 # ===================================================================
-# BinaryOp -- element-wise binary (phase 1: add only)
+# BinaryOp -- element-wise binary
 # ===================================================================
 
 cdef class BinaryOp(FlexOp):
@@ -525,3 +570,87 @@ cdef class BinaryOp(FlexOp):
         # pc[1] = count << 48 | xd << 18 | xm
         cdef unsigned long long word1 = (count << 48) | (xd << 18) | xm
         code.append_u64(word1)
+
+
+# ===================================================================
+# UnaryOp -- element-wise unary (Batch A)
+# ===================================================================
+
+cdef class UnaryOp(FlexOp):
+    """Element-wise unary operation.
+
+    Parameters
+    ----------
+    op_type : int
+        UnaryType enum value (e.g. UNARY_SQRT).
+    src : NDObject
+        Input operand.
+    """
+
+    def __init__(self, int op_type, NDObject src):
+        super().__init__(OBJ_UNARY, src.type_id, src.shape_ref, src, None)
+        self.op_type = op_type
+
+    def normalize(self):
+        """Output shape = input shape.  Output dtype = input dtype for most ops.
+        isfinite (UNARY_ISFINITE) returns DTYPE_BOOL.
+        """
+        if self.lhs is None:
+            raise ValueError("UnaryOp: source must not be None")
+        self.shape_ref = self.lhs.shape_ref
+        self.type_id = self.lhs.type_id
+        if self.op_type == UNARY_ISFINITE:
+            self.type_id = DTYPE_BOOL
+        self.normalized = True
+
+    def emit(self, Code code, list relocs):
+        """Emit a vUnary instruction.
+
+        Uses vUnary::Encode format (2 words):
+            pc[0] = vMakeSimdHead(opcode, xd, 2)
+            pc[1] = xn << 32 | count
+
+        Note: for vUnary the ext field carries xd (the destination),
+        unlike vBinary where ext = xn.
+        count = nd_.stride_back() = SIMD-aligned element count.
+        """
+        cdef int ndim = len(self.shape_ref)
+        cdef int simd_width = _SIMD_WIDTH[self.lhs.type_id]
+
+        # stride_back: same calculation as BinaryOp
+        cdef list dims = []
+        cdef int i
+        for i in range(ndim):
+            dims.append(self.lhs.shape_ref[ndim - 1 - i])
+
+        cdef long long stride = _round_up(<long long>dims[0], simd_width)
+        for i in range(1, ndim):
+            stride = <long long>dims[i] * stride
+        cdef unsigned long long count = <unsigned long long>stride
+
+        # Look up instruction opcode
+        cdef tuple key = (self.op_type, self.lhs.type_id)
+        if key not in UNARY_OPCODE_TABLE:
+            raise NotImplementedError(
+                f"UnaryOp: unsupported op_type={self.op_type}, "
+                f"dtype={self.lhs.type_id}"
+            )
+        cdef unsigned long long insn_id = <unsigned long long>UNARY_OPCODE_TABLE[key]
+
+        # Use encode_unary helper
+        cdef list words = encode_unary(insn_id, <unsigned long long>self.xbuf,
+                                        <unsigned long long>self.lhs.xbuf, count)
+
+        # Apply sync flags to head word
+        cdef unsigned long long head = <unsigned long long>words[0]
+        head |= (<unsigned long long>self.sync_set << V_HEAD_SET_FLAG_OFFSET)
+        head |= (<unsigned long long>self.sync_wait << V_HEAD_WAIT_FLAG_OFFSET)
+        head |= (<unsigned long long>self.sync_back_set << V_HEAD_BACK_SET_OFFSET)
+        head |= (<unsigned long long>self.sync_back_wait << V_HEAD_BACK_WAIT_OFFSET)
+        head |= (<unsigned long long>(self.sync_set_event & 0x7) << V_HEAD_SET_EVENT_OFFSET)
+        head |= (<unsigned long long>(self.sync_wait_event & 0x7) << V_HEAD_WAIT_EVENT_OFFSET)
+        head |= (<unsigned long long>(self.sync_b_set_event & 0x7) << V_HEAD_B_SET_EVENT_OFFSET)
+        head |= (<unsigned long long>(self.sync_b_wait_event & 0x7) << V_HEAD_B_WAIT_EVENT_OFFSET)
+        code.append_u64(head)
+
+        code.append_u64(<unsigned long long>words[1])

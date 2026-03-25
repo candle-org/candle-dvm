@@ -70,3 +70,10 @@ cdef class FlexOp(NDObject):
 # ---------------------------------------------------------------------------
 cdef class BinaryOp(FlexOp):
     cdef public int op_type
+
+
+# ---------------------------------------------------------------------------
+# UnaryOp
+# ---------------------------------------------------------------------------
+cdef class UnaryOp(FlexOp):
+    cdef public int op_type

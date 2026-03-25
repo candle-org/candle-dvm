@@ -7,13 +7,24 @@ import pytest
 from candle_dvm import isa
 from candle_dvm.code import Code, RelocAddr
 from candle_dvm.ops import (
+    DTYPE_BOOL,
     DTYPE_F32,
+    DTYPE_FP16,
+    DTYPE_INT32,
     BIN_ADD,
+    BIN_SUB,
+    BIN_MUL,
+    BIN_DIV,
+    BIN_MAX,
+    BIN_MIN,
+    UNARY_ISFINITE,
+    UNARY_SQRT,
     OBJ_LOAD,
     OBJ_STORE,
     OBJ_BINARY,
     NDLoad,
     NDStore,
+    UnaryOp,
     BinaryOp,
 )
 from candle_dvm.pass_ import run_passes
@@ -418,3 +429,256 @@ class TestPassManager:
         load = NDLoad(io_index=0, shape=(4, 8), dtype=DTYPE_F32)
         result = run_passes([load])
         assert result[0] is load
+
+
+# ===================================================================
+# UnaryOp -- construction, normalize, emit
+# ===================================================================
+
+class TestUnaryOp:
+    def _make_load(self, shape=(4, 8), dtype=DTYPE_F32):
+        load = NDLoad(io_index=0, shape=shape, dtype=dtype)
+        load.normalize()
+        load.xbuf = 0
+        return load
+
+    def test_normalize_preserves_shape_and_dtype_for_sqrt(self):
+        """UnaryOp normalize should set output shape = input shape
+        and output dtype = input dtype for sqrt."""
+        src = self._make_load(shape=(4, 8), dtype=DTYPE_F32)
+        op = UnaryOp(UNARY_SQRT, src)
+        op.normalize()
+        assert op.shape_ref == (4, 8)
+        assert op.type_id == DTYPE_F32
+        assert op.normalized is True
+
+    def test_normalize_sets_bool_dtype_for_isfinite(self):
+        """UnaryOp(isfinite) should set output dtype to DTYPE_BOOL."""
+        src = self._make_load(shape=(4, 8), dtype=DTYPE_F32)
+        op = UnaryOp(UNARY_ISFINITE, src)
+        op.normalize()
+        assert op.shape_ref == (4, 8)
+        assert op.type_id == DTYPE_BOOL
+
+    def test_emit_appends_exactly_two_words(self):
+        """UnaryOp.emit should append exactly 2 u64 words (16 bytes)."""
+        src = self._make_load(shape=(4, 8), dtype=DTYPE_F32)
+        op = UnaryOp(UNARY_SQRT, src)
+        op.normalize()
+        op.xbuf = 1
+
+        code = Code()
+        relocs = []
+        try:
+            op.emit(code, relocs)
+            assert code.size == 16  # 2 words * 8 bytes
+        finally:
+            code.free()
+
+    def test_emit_registers_zero_relocations(self):
+        """UnaryOp.emit should register 0 relocations."""
+        src = self._make_load(shape=(4, 8), dtype=DTYPE_F32)
+        op = UnaryOp(UNARY_SQRT, src)
+        op.normalize()
+        op.xbuf = 1
+
+        code = Code()
+        relocs = []
+        try:
+            op.emit(code, relocs)
+            assert len(relocs) == 0
+        finally:
+            code.free()
+
+    def test_emit_raises_for_unsupported_dtype(self):
+        """UnaryOp.emit should raise NotImplementedError for INT32 + SQRT."""
+        src = self._make_load(shape=(4, 8), dtype=DTYPE_INT32)
+        op = UnaryOp(UNARY_SQRT, src)
+        op.normalize()
+        op.xbuf = 1
+
+        code = Code()
+        relocs = []
+        try:
+            with pytest.raises(NotImplementedError):
+                op.emit(code, relocs)
+        finally:
+            code.free()
+
+
+# ===================================================================
+# BinaryOp -- Batch B expansion (sub, mul, div, max, min + fp16)
+# ===================================================================
+
+class TestBinaryOpBatchB:
+    """Tests for expanded binary ops: sub, mul, div, max, min for fp32 and fp16."""
+
+    def _make_loads(self, shape=(4, 8), dtype=DTYPE_F32):
+        lhs = NDLoad(io_index=0, shape=shape, dtype=dtype)
+        lhs.normalize()
+        lhs.xbuf = 0
+        rhs = NDLoad(io_index=1, shape=shape, dtype=dtype)
+        rhs.normalize()
+        rhs.xbuf = 1
+        return lhs, rhs
+
+    # --- constants ---
+
+    def test_bin_sub_constant(self):
+        assert BIN_SUB == 7
+
+    def test_bin_mul_constant(self):
+        assert BIN_MUL == 8
+
+    def test_bin_div_constant(self):
+        assert BIN_DIV == 9
+
+    def test_bin_max_constant(self):
+        assert BIN_MAX == 11
+
+    def test_bin_min_constant(self):
+        assert BIN_MIN == 12
+
+    # --- sub fp32 ---
+
+    def test_binary_sub_emit_uses_v_sub_fp32(self):
+        """BinaryOp(BIN_SUB) with fp32 inputs should emit 2 words (16 bytes)
+        and use V_SUB opcode."""
+        lhs, rhs = self._make_loads(shape=(4, 8), dtype=DTYPE_F32)
+        op = BinaryOp(BIN_SUB, lhs, rhs)
+        op.normalize()
+        op.xbuf = 2
+
+        code = Code()
+        relocs = []
+        try:
+            op.emit(code, relocs)
+            assert code.size == 16  # 2 words
+            assert len(relocs) == 0
+            head = code.read_u64_at(0)
+            opcode = (head >> isa.V_HEAD_ID_OFFSET) & isa.V_HEAD_ID_MASK
+            assert opcode == isa.SIMD_FUNC_OFFSET[isa.V_SUB]
+        finally:
+            code.free()
+
+    # --- mul fp16 ---
+
+    def test_binary_mul_emit_uses_v_mul_fp16(self):
+        """BinaryOp(BIN_MUL) with fp16 inputs should emit 2 words (16 bytes)
+        and use V_MUL_FP16 opcode."""
+        lhs, rhs = self._make_loads(shape=(4, 16), dtype=DTYPE_FP16)
+        op = BinaryOp(BIN_MUL, lhs, rhs)
+        op.normalize()
+        op.xbuf = 2
+
+        code = Code()
+        relocs = []
+        try:
+            op.emit(code, relocs)
+            assert code.size == 16  # 2 words
+            assert len(relocs) == 0
+            head = code.read_u64_at(0)
+            opcode = (head >> isa.V_HEAD_ID_OFFSET) & isa.V_HEAD_ID_MASK
+            assert opcode == isa.SIMD_FUNC_OFFSET[isa.V_MUL_FP16]
+        finally:
+            code.free()
+
+    # --- existing add still works ---
+
+    def test_binary_add_fp32_still_works(self):
+        """Existing BIN_ADD + fp32 path must remain functional."""
+        lhs, rhs = self._make_loads(shape=(4, 8), dtype=DTYPE_F32)
+        op = BinaryOp(BIN_ADD, lhs, rhs)
+        op.normalize()
+        op.xbuf = 2
+
+        code = Code()
+        relocs = []
+        try:
+            op.emit(code, relocs)
+            assert code.size == 16
+            head = code.read_u64_at(0)
+            opcode = (head >> isa.V_HEAD_ID_OFFSET) & isa.V_HEAD_ID_MASK
+            assert opcode == isa.SIMD_FUNC_OFFSET[isa.V_ADD]
+        finally:
+            code.free()
+
+    # --- add fp16 ---
+
+    def test_binary_add_fp16(self):
+        """BIN_ADD + fp16 should use V_ADD_FP16."""
+        lhs, rhs = self._make_loads(shape=(4, 16), dtype=DTYPE_FP16)
+        op = BinaryOp(BIN_ADD, lhs, rhs)
+        op.normalize()
+        op.xbuf = 2
+
+        code = Code()
+        relocs = []
+        try:
+            op.emit(code, relocs)
+            assert code.size == 16
+            head = code.read_u64_at(0)
+            opcode = (head >> isa.V_HEAD_ID_OFFSET) & isa.V_HEAD_ID_MASK
+            assert opcode == isa.SIMD_FUNC_OFFSET[isa.V_ADD_FP16]
+        finally:
+            code.free()
+
+    # --- div fp32 ---
+
+    def test_binary_div_fp32(self):
+        """BIN_DIV + fp32 should use V_DIV."""
+        lhs, rhs = self._make_loads(shape=(4, 8), dtype=DTYPE_F32)
+        op = BinaryOp(BIN_DIV, lhs, rhs)
+        op.normalize()
+        op.xbuf = 2
+
+        code = Code()
+        relocs = []
+        try:
+            op.emit(code, relocs)
+            assert code.size == 16
+            head = code.read_u64_at(0)
+            opcode = (head >> isa.V_HEAD_ID_OFFSET) & isa.V_HEAD_ID_MASK
+            assert opcode == isa.SIMD_FUNC_OFFSET[isa.V_DIV]
+        finally:
+            code.free()
+
+    # --- max fp32 ---
+
+    def test_binary_max_fp32(self):
+        """BIN_MAX + fp32 should use V_MAX."""
+        lhs, rhs = self._make_loads(shape=(4, 8), dtype=DTYPE_F32)
+        op = BinaryOp(BIN_MAX, lhs, rhs)
+        op.normalize()
+        op.xbuf = 2
+
+        code = Code()
+        relocs = []
+        try:
+            op.emit(code, relocs)
+            assert code.size == 16
+            head = code.read_u64_at(0)
+            opcode = (head >> isa.V_HEAD_ID_OFFSET) & isa.V_HEAD_ID_MASK
+            assert opcode == isa.SIMD_FUNC_OFFSET[isa.V_MAX]
+        finally:
+            code.free()
+
+    # --- min fp16 ---
+
+    def test_binary_min_fp16(self):
+        """BIN_MIN + fp16 should use V_MIN_FP16."""
+        lhs, rhs = self._make_loads(shape=(4, 16), dtype=DTYPE_FP16)
+        op = BinaryOp(BIN_MIN, lhs, rhs)
+        op.normalize()
+        op.xbuf = 2
+
+        code = Code()
+        relocs = []
+        try:
+            op.emit(code, relocs)
+            assert code.size == 16
+            head = code.read_u64_at(0)
+            opcode = (head >> isa.V_HEAD_ID_OFFSET) & isa.V_HEAD_ID_MASK
+            assert opcode == isa.SIMD_FUNC_OFFSET[isa.V_MIN_FP16]
+        finally:
+            code.free()
