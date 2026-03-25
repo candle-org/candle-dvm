@@ -20,7 +20,8 @@ Example
 
 from candle_dvm.kernel import VKernelS
 from candle_dvm.ops import (
-    NDLoad, NDStore, BinaryOp, BIN_ADD,
+    NDLoad, NDStore, BinaryOp, BIN_ADD, BIN_SUB, BIN_MUL, BIN_DIV,
+    BIN_MAX, BIN_MIN,
     UnaryOp, UNARY_SQRT, UNARY_ABS, UNARY_LOG, UNARY_EXP,
     UNARY_ROUND, UNARY_FLOOR, UNARY_CEIL, UNARY_TRUNC, UNARY_ISFINITE,
 )
@@ -112,6 +113,101 @@ cdef class Kernel:
             The created add node, already appended to the kernel.
         """
         cdef object node = BinaryOp(BIN_ADD, a, b)
+        self._kernel.append(node)
+        return node
+
+    cpdef object sub(self, object a, object b):
+        """Create an element-wise subtract node.
+
+        Parameters
+        ----------
+        a : NDObject
+            Left-hand operand.
+        b : NDObject
+            Right-hand operand.
+
+        Returns
+        -------
+        BinaryOp
+            The created sub node, already appended to the kernel.
+        """
+        cdef object node = BinaryOp(BIN_SUB, a, b)
+        self._kernel.append(node)
+        return node
+
+    cpdef object mul(self, object a, object b):
+        """Create an element-wise multiply node.
+
+        Parameters
+        ----------
+        a : NDObject
+            Left-hand operand.
+        b : NDObject
+            Right-hand operand.
+
+        Returns
+        -------
+        BinaryOp
+            The created mul node, already appended to the kernel.
+        """
+        cdef object node = BinaryOp(BIN_MUL, a, b)
+        self._kernel.append(node)
+        return node
+
+    cpdef object div(self, object a, object b):
+        """Create an element-wise divide node.
+
+        Parameters
+        ----------
+        a : NDObject
+            Left-hand operand.
+        b : NDObject
+            Right-hand operand.
+
+        Returns
+        -------
+        BinaryOp
+            The created div node, already appended to the kernel.
+        """
+        cdef object node = BinaryOp(BIN_DIV, a, b)
+        self._kernel.append(node)
+        return node
+
+    cpdef object maximum(self, object a, object b):
+        """Create an element-wise maximum node.
+
+        Parameters
+        ----------
+        a : NDObject
+            Left-hand operand.
+        b : NDObject
+            Right-hand operand.
+
+        Returns
+        -------
+        BinaryOp
+            The created max node, already appended to the kernel.
+        """
+        cdef object node = BinaryOp(BIN_MAX, a, b)
+        self._kernel.append(node)
+        return node
+
+    cpdef object minimum(self, object a, object b):
+        """Create an element-wise minimum node.
+
+        Parameters
+        ----------
+        a : NDObject
+            Left-hand operand.
+        b : NDObject
+            Right-hand operand.
+
+        Returns
+        -------
+        BinaryOp
+            The created min node, already appended to the kernel.
+        """
+        cdef object node = BinaryOp(BIN_MIN, a, b)
         self._kernel.append(node)
         return node
 

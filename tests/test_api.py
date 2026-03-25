@@ -74,3 +74,37 @@ def test_reciprocal_is_not_exposed():
 def test_logical_not_is_not_exposed():
     """logical_not should not be on the public Kernel API."""
     assert not hasattr(Kernel, "logical_not")
+
+
+def test_kernel_exposes_batch_b_binary_methods():
+    """All Batch B binary methods return nodes with correct shapes."""
+    k = Kernel()
+    a = k.load((16, 16), float32)
+    b = k.load((16, 16), float32)
+
+    s = k.sub(a, b)
+    assert s.shape_ref == (16, 16)
+
+    m = k.mul(a, b)
+    assert m.shape_ref == (16, 16)
+
+    d = k.div(a, b)
+    assert d.shape_ref == (16, 16)
+
+    mx = k.maximum(a, b)
+    assert mx.shape_ref == (16, 16)
+
+    mn = k.minimum(a, b)
+    assert mn.shape_ref == (16, 16)
+
+
+def test_add_still_works():
+    """Ensure add path still works after Batch B changes."""
+    k = Kernel()
+    a = k.load((32, 32), float32)
+    b = k.load((32, 32), float32)
+    out = k.add(a, b)
+    assert out.shape_ref == (32, 32)
+    k.store(out)
+    k.codegen()
+    assert len(k.get_relocs()) == 3
